@@ -60,19 +60,19 @@
         camera.position.z = 5;
 
         // --- Image Sequence Setup ---
-        // ===================================================================
-        // UPDATED based on your new file structure (steps of 4)
-        // ===================================================================
-        const frameCount = 90; // Total images: (356 / 4) + 1
-        const imagePath = 'frame_';
-        const textures = [];
+        const frameCount = 90; // Number of frames in EACH sequence
+        
+        // NEW: Separate arrays and paths for each direction
+        const horizontalTextures = [];
+        const verticalTextures = [];
+        const horizontalImagePath = 'frame_';
+        const verticalImagePath = 'frame_v_';
         
 
         // --- Preload all images for a smooth experience ---
         const manager = new THREE.LoadingManager();
         const textureLoader = new THREE.TextureLoader(manager);
 
-        // Add progress and error handlers for better feedback
         manager.onProgress = function ( url, itemsLoaded, itemsTotal ) {
             loaderElement.textContent = `Loading... ${itemsLoaded} / ${itemsTotal}`;
         };
@@ -83,17 +83,21 @@
             loaderElement.style.color = 'red';
         };
 
+        // Load horizontal images
         for (let i = 0; i < frameCount; i++) {
-            // ===================================================================
-            // UPDATED to generate filenames in steps of 4 (0, 4, 8, ... 356)
-            // ===================================================================
             const frameNumber = i * 4;
-            const filename = `${imagePath}${String(frameNumber).padStart(3, '0')}.png`;
-            textures.push(textureLoader.load(filename));
+            const filename = `${horizontalImagePath}${String(frameNumber).padStart(3, '0')}.png`;
+            horizontalTextures.push(textureLoader.load(filename));
+        }
+        
+        // Load vertical images
+        for (let i = 0; i < frameCount; i++) {
+            const frameNumber = i * 4;
+            const filename = `${verticalImagePath}${String(frameNumber).padStart(3, '0')}.png`;
+            verticalTextures.push(textureLoader.load(filename));
         }
 
         // --- Create a plane to display the images on ---
-        // We'll set the size after the first image loads to get the aspect ratio right.
         let plane;
         const geometry = new THREE.PlaneGeometry(1, 1);
         const material = new THREE.MeshBasicMaterial({
@@ -107,12 +111,15 @@
         // --- Mouse Interaction Logic ---
         let isDragging = false;
         let previousMouseX = 0;
-        let currentFrame = 0;
-        const rotationSensitivity = 0.5; // How fast it "rotates" when you drag
+        let previousMouseY = 0;
+        let currentHorizontalFrame = 0;
+        let currentVerticalFrame = 0;
+        const rotationSensitivity = 0.5;
 
         canvas.addEventListener('mousedown', (e) => {
             isDragging = true;
             previousMouseX = e.clientX;
+            previousMouseY = e.clientY;
         });
 
         window.addEventListener('mouseup', () => {
@@ -123,46 +130,54 @@
             if (!isDragging) return;
 
             const deltaX = e.clientX - previousMouseX;
-            const frameChange = Math.round(deltaX * rotationSensitivity);
+            const deltaY = e.clientY - previousMouseY;
 
-            // Update the frame, wrapping around if necessary
-            currentFrame = (currentFrame - frameChange + frameCount * 100) % frameCount;
-            
-            // Update the texture on the plane
-            if (textures[currentFrame]) {
-                material.map = textures[currentFrame];
-                material.needsUpdate = true;
+            // Determine if the primary drag direction is horizontal or vertical
+            if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                // Horizontal Drag
+                const frameChange = Math.round(deltaX * rotationSensitivity);
+                currentHorizontalFrame = (currentHorizontalFrame - frameChange + frameCount) % frameCount;
+                if (horizontalTextures[currentHorizontalFrame]) {
+                    material.map = horizontalTextures[currentHorizontalFrame];
+                    material.needsUpdate = true;
+                }
+            } else {
+                // Vertical Drag
+                const frameChange = Math.round(deltaY * rotationSensitivity);
+                currentVerticalFrame = (currentVerticalFrame - frameChange + frameCount) % frameCount;
+                if (verticalTextures[currentVerticalFrame]) {
+                    material.map = verticalTextures[currentVerticalFrame];
+                    material.needsUpdate = true;
+                }
             }
 
             previousMouseX = e.clientX;
+            previousMouseY = e.clientY;
         });
 
 
         // --- Final Setup & Animation ---
         manager.onLoad = () => {
-            // Hide the "Loading..." text
             loaderElement.style.display = 'none';
             
-            // Add a check to ensure the first image has loaded correctly.
-            if (!textures[0] || !textures[0].image || textures[0].image.width === 0) {
-                console.error("The first image could not be loaded. Cannot determine aspect ratio.");
+            if (!horizontalTextures[0] || !horizontalTextures[0].image || horizontalTextures[0].image.width === 0) {
+                console.error("The first horizontal image could not be loaded.");
                 loaderElement.textContent = `Error: Images could not be loaded.`;
                 loaderElement.style.color = 'red';
                 loaderElement.style.display = 'block';
-                return; // Stop execution if images are broken
+                return;
             }
             
-            // Set the first frame
-            material.map = textures[0];
+            // Set the initial frame
+            material.map = horizontalTextures[0];
             
             // Adjust plane size to match image aspect ratio
-            const firstImage = textures[0].image;
+            const firstImage = horizontalTextures[0].image;
             const aspectRatio = firstImage.width / firstImage.height;
             const planeHeight = 6; // Set the desired height of the viewer
             const planeWidth = planeHeight * aspectRatio;
             plane.scale.set(planeWidth, planeHeight, 1);
 
-            // Start the animation loop
             animate();
         };
 
@@ -171,7 +186,6 @@
             renderer.render(scene, camera);
         }
 
-        // --- Handle Window Resizing ---
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
