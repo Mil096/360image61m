@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Image Sequence Spinner</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            /* You can set a background color here if you want */
+            /* background-color: #f0f0f0; */
+        }
+        canvas {
+            display: block;
+            cursor: grab;
+        }
+        canvas:active {
+            cursor: grabbing;
+        }
+        #loader {
+            position: absolute;
+            font-family: sans-serif;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loader">Loading...</div>
+    <canvas id="c"></canvas>
+
+    <!-- Import three.js -->
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.module.js"
+        }
+      }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- Basic Scene Setup ---
+        const canvas = document.querySelector('#c');
+        const loaderElement = document.getElementById('loader');
+        const renderer = new THREE.WebGLRenderer({ antialias: true, canvas, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 5;
+
+        // --- Image Sequence Setup ---
+        const frameCount = 90;
+        const textures = [];
+        
+        // ===================================================================
+        //  FIX: Switched to a more reliable placeholder service for the preview.
+        //  For your final website, you should host your own images (e.g., via Netlify)
+        //  and replace this URL with the path to your image folder.
+        // ===================================================================
+        const imagePath = 'https://picsum.photos/512/512?random=';
+
+
+        // --- Preload all images for a smooth experience ---
+        const manager = new THREE.LoadingManager();
+        const textureLoader = new THREE.TextureLoader(manager);
+
+        // Add progress and error handlers for better feedback
+        manager.onProgress = function ( url, itemsLoaded, itemsTotal ) {
+            loaderElement.textContent = `Loading... ${itemsLoaded} / ${itemsTotal}`;
+        };
+
+        manager.onError = function ( url ) {
+            console.error( 'There was an error loading ' + url );
+            loaderElement.textContent = `Error: Could not load images. Please check the image path.`;
+            loaderElement.style.color = 'red';
+        };
+
+        for (let i = 0; i < frameCount; i++) {
+            // Creates filenames like '...random=0', '...random=1', etc.
+            const filename = `${imagePath}${i}`;
+            textures.push(textureLoader.load(filename));
+        }
+
+        // --- Create a plane to display the images on ---
+        // We'll set the size after the first image loads to get the aspect ratio right.
+        let plane;
+        const geometry = new THREE.PlaneGeometry(1, 1);
+        const material = new THREE.MeshBasicMaterial({
+            map: new THREE.Texture(), // Start with an empty texture
+            transparent: true
+        });
+        plane = new THREE.Mesh(geometry, material);
+        scene.add(plane);
+
+
+        // --- Mouse Interaction Logic ---
+        let isDragging = false;
+        let previousMouseX = 0;
+        let currentFrame = 0;
+        const rotationSensitivity = 0.5; // How fast it "rotates" when you drag
+
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            previousMouseX = e.clientX;
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+
+            const deltaX = e.clientX - previousMouseX;
+            const frameChange = Math.round(deltaX * rotationSensitivity);
+
+            // Update the frame, wrapping around if necessary
+            currentFrame = (currentFrame - frameChange + frameCount * 100) % frameCount;
+            
+            // Update the texture on the plane
+            if (textures[currentFrame]) {
+                material.map = textures[currentFrame];
+                material.needsUpdate = true;
+            }
+
+            previousMouseX = e.clientX;
+        });
+
+
+        // --- Final Setup & Animation ---
+        manager.onLoad = () => {
+            // Hide the "Loading..." text
+            loaderElement.style.display = 'none';
+            
+            // Add a check to ensure the first image has loaded correctly.
+            if (!textures[0] || !textures[0].image || textures[0].image.width === 0) {
+                console.error("The first image could not be loaded. Cannot determine aspect ratio.");
+                loaderElement.textContent = `Error: Images could not be loaded.`;
+                loaderElement.style.color = 'red';
+                loaderElement.style.display = 'block';
+                return; // Stop execution if images are broken
+            }
+            
+            // Set the first frame
+            material.map = textures[0];
+            
+            // Adjust plane size to match image aspect ratio
+            const firstImage = textures[0].image;
+            const aspectRatio = firstImage.width / firstImage.height;
+            const planeHeight = 6; // Set the desired height of the viewer
+            const planeWidth = planeHeight * aspectRatio;
+            plane.scale.set(planeWidth, planeHeight, 1);
+
+            // Start the animation loop
+            animate();
+        };
+
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+
+        // --- Handle Window Resizing ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+    </script>
+</body>
+</html>
