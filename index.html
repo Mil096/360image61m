@@ -35,7 +35,6 @@
     <div id="loader">Loading...</div>
     <canvas id="c"></canvas>
 
-    <!-- Import three.js -->
     <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
     <script type="importmap">
       {
@@ -64,11 +63,9 @@
         const textures = [];
         
         // ===================================================================
-        //  FIX: Switched to a more reliable placeholder service for the preview.
-        //  For your final website, you should host your own images (e.g., via Netlify)
-        //  and replace this URL with the path to your image folder.
+        //  FINAL FIX: This now points to your live GitHub Pages site.
         // ===================================================================
-        const imagePath = 'https://mil096.github.io/360image61m/';
+        const imagePath = 'https://mil096.github.io/360image61m/bag_';
 
 
         // --- Preload all images for a smooth experience ---
@@ -87,8 +84,8 @@
         };
 
         for (let i = 0; i < frameCount; i++) {
-            // Creates filenames like '...random=0', '...random=1', etc.
-            const filename = `${imagePath}${i}`;
+            // Creates filenames like '.../bag_00.png', '.../bag_01.png', etc.
+            const filename = `${imagePath}${String(i).padStart(2, '0')}.png`;
             textures.push(textureLoader.load(filename));
         }
 
